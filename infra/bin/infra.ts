@@ -4,4 +4,4 @@ import { CartApiStack } from '../lib/cart-api-stack';
 
 const app = new cdk.App();
 
-new CartApiStack(app, 'CartApiStack');
+new CartApiStack(app, 'CartApiStack', {});
