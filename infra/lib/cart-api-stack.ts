@@ -6,6 +6,9 @@ import { Construct } from 'constructs';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as rds from 'aws-cdk-lib/aws-rds';
+import * as dotenv from 'dotenv';
+
+dotenv.config();
 
 export class CartApiStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -38,6 +41,7 @@ export class CartApiStack extends cdk.Stack {
     );
 
     const dbInstance = new rds.DatabaseInstance(this, 'CartApiPostgres', {
+      databaseName: 'cartdb',
       engine: rds.DatabaseInstanceEngine.postgres({
         version: rds.PostgresEngineVersion.VER_14,
       }),
@@ -54,23 +58,30 @@ export class CartApiStack extends cdk.Stack {
       allocatedStorage: 20,
       maxAllocatedStorage: 100,
       securityGroups: [rdsSecurityGroup],
-      publiclyAccessible: false,
+      publiclyAccessible: true,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       deleteAutomatedBackups: true,
     });
 
     const lambdaFunction = new NodejsFunction(this, 'LambdaFunction', {
       runtime: lambda.Runtime.NODEJS_20_X,
-      entry: path.join(__dirname, '../..', 'dist', 'src', 'main.js'),
+      entry: path.join(__dirname, '../..', 'dist', 'main.js'),
       projectRoot: path.join(__dirname, '../..'),
       timeout: cdk.Duration.seconds(30),
       memorySize: 1024,
       vpc,
       securityGroups: [lambdaSecurityGroup],
       environment: {
+        DB_HOST: process.env.DB_HOST || dbInstance.dbInstanceEndpointAddress,
+        DB_PORT: String(
+          process.env.DB_PORT || dbInstance.dbInstanceEndpointPort,
+        ),
+        DB_NAME: process.env.DB_NAME || 'cartdb',
+        DB_USERNAME: process.env.DB_USERNAME || 'postgres',
+        DB_PASSWORD: String(process.env.DB_PASSWORD || ''),
+        DB_SSL: process.env.DB_SSL || 'false',
         DB_SECRET_ARN: dbInstance.secret?.secretArn || '',
-        DB_HOST: dbInstance.dbInstanceEndpointAddress,
-        DB_PORT: dbInstance.dbInstanceEndpointPort,
+        LAST_DEPLOY: new Date().toISOString(),
       },
       bundling: {
         forceDockerBundling: false,
